@@ -10,6 +10,7 @@ import {
   extractRows,
   extractRowsFromText,
   extractHdfcRows,
+  extractHdfcRowsFromText,
   refineBankRows,
   inferTypesFromBalance,
   cleanMerchant,
@@ -38,7 +39,7 @@ export class PdfParserService {
       const accountType = detection.accountType;
 
       // Step 2: Position-aware line extraction
-      let rows: RawRow[];
+      let rows: RawRow[] = [];
       try {
         const lines = await extractPdfLines(arrayBuffer);
 
@@ -55,17 +56,22 @@ export class PdfParserService {
         if (rows.length === 0) {
           rows = extractRows(lines);
         }
-      } catch {
-        // Fallback to flat text extraction
-        rows = extractRowsFromText(flatText);
-        if (rows.length === 0) {
-          errors.push('Position-aware extraction failed, fell back to flat text.');
-        }
+      } catch (e) {
+        errors.push(`Position-aware extraction failed: ${e}`);
       }
 
       // Step 3: If position-aware found nothing, try flat text
       if (rows.length === 0) {
-        rows = extractRowsFromText(flatText);
+        const hdfcRows = extractHdfcRowsFromText(flatText);
+        if (hdfcRows.length > 0) {
+          rows = hdfcRows;
+          if (!bankName.toUpperCase().includes('HDFC')) {
+            bankName = detectedBank.toUpperCase().includes('HDFC') ? detectedBank : 'HDFC Bank';
+          }
+          errors.push('Used HDFC flat-text fallback extraction.');
+        } else {
+          rows = extractRowsFromText(flatText);
+        }
       }
 
       if (rows.length === 0) {

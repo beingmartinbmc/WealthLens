@@ -5,7 +5,7 @@ export { deduplicateTransactions } from './deduplicator';
 export { extractPdfLines, extractPdfFlatText } from './pdf-text-extractor';
 export { detectBank } from './bank-detector';
 export { extractRows, extractRowsFromText, refineBankRows, inferTypesFromBalance } from './row-extractor';
-export { extractHdfcRows, detectHdfcColumns } from './hdfc-extractor';
+export { extractHdfcRows, extractHdfcRowsFromText, detectHdfcColumns } from './hdfc-extractor';
 export type { TextLine, TextItem } from './pdf-text-extractor';
 export type { BankDetection } from './bank-detector';
 export type { RawRow } from './row-extractor';
