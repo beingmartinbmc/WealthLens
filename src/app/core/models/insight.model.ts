@@ -1,6 +1,6 @@
 export interface Insight {
   id: string;
-  type: 'spending' | 'saving' | 'anomaly' | 'subscription' | 'trend' | 'tax';
+  type: 'spending' | 'saving' | 'anomaly' | 'subscription' | 'trend' | 'tax' | 'ai';
   priority: 'high' | 'medium' | 'low';
   title: string;
   message: string;

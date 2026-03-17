@@ -76,6 +76,18 @@
       }
     </div>
 
+    <!-- AI Tax Tips -->
+    @if (aiTaxTips().length > 0) {
+      <div class="ai-tips-section">
+        <h2>🤖 AI Tax Suggestions</h2>
+        <div class="ai-tips-list">
+          @for (tip of aiTaxTips(); track tip) {
+            <div class="ai-tip-card">{{ tip }}</div>
+          }
+        </div>
+      </div>
+    }
+
     <!-- Disclaimer -->
     <div class="tax-disclaimer">
       <span class="disclaimer-icon">⚠️</span>

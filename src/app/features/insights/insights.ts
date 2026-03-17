@@ -3,8 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { StorageService } from '../../core/services/storage.service';
 import { AnalyticsService } from '../../core/services/analytics.service';
+import { ApiService } from '../../core/services/api.service';
 import { Transaction } from '../../core/models/transaction.model';
 import { Insight, Anomaly, SubscriptionDetection } from '../../core/models/insight.model';
+import { buildLLMSummary } from '../../core/services/parsing/normalizer';
+import { PROMPTS, buildPrompt } from '../../core/config/prompts';
+import { v4 as uuidv4 } from 'uuid';
 
 @Component({
   selector: 'app-insights',
@@ -23,6 +27,7 @@ export class InsightsComponent implements OnInit {
   constructor(
     private storage: StorageService,
     private analytics: AnalyticsService,
+    private api: ApiService,
     private router: Router
   ) {}
 
@@ -40,8 +45,8 @@ export class InsightsComponent implements OnInit {
     }
 
     const summary = this.analytics.computeSummary(txns);
-    const insights = this.analytics.generateInsights(txns, summary);
-    this.insights.set(insights);
+    const localInsights = this.analytics.generateInsights(txns, summary);
+    this.insights.set(localInsights);
 
     const anomalies = this.analytics.detectAnomalies(txns);
     this.anomalies.set(anomalies);
@@ -52,6 +57,9 @@ export class InsightsComponent implements OnInit {
     await this.storage.saveSubscriptions(subs);
 
     this.loading.set(false);
+
+    // Enrich with AI insights in background
+    this.fetchAIInsights(txns, localInsights);
   }
 
   setTab(tab: 'insights' | 'anomalies' | 'subscriptions'): void {
@@ -103,5 +111,37 @@ export class InsightsComponent implements OnInit {
 
   goToUpload(): void {
     this.router.navigate(['/upload']);
+  }
+
+  private async fetchAIInsights(txns: Transaction[], localInsights: Insight[]): Promise<void> {
+    try {
+      const context = buildLLMSummary(txns);
+      const prompt = buildPrompt(PROMPTS.INSIGHTS, { CONTEXT: context });
+      const result = await this.api.callGeneric(prompt, context);
+
+      if (!result.success || !result.data) return;
+
+      const parsed = this.api.parseJsonResponse<
+        { title: string; message: string; priority: string; amount?: number; percentChange?: number }[]
+      >(result.data);
+
+      if (!parsed || !Array.isArray(parsed)) return;
+
+      const aiInsights: Insight[] = parsed.map(item => ({
+        id: uuidv4(),
+        type: 'ai',
+        title: '🤖 ' + item.title,
+        message: item.message,
+        priority: (item.priority as 'high' | 'medium' | 'low') || 'medium',
+        amount: item.amount,
+        percentChange: item.percentChange,
+        createdAt: new Date().toISOString(),
+      }));
+
+      // Merge: AI insights after local ones
+      this.insights.set([...localInsights, ...aiInsights]);
+    } catch {
+      // Silently fail — local insights are already displayed
+    }
   }
 }

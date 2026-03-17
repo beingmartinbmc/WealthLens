@@ -27,7 +27,9 @@ export class ApiService {
       }
 
       const json = await res.json();
-      return { success: true, data: json.response ?? json.data ?? JSON.stringify(json) };
+      // Extract content from nested OpenAI-style response
+      const content = this.extractContent(json);
+      return { success: true, data: content };
     } catch (e) {
       return { success: false, data: '', error: String(e) };
     }
@@ -47,6 +49,30 @@ export class ApiService {
     const template = PROMPTS[promptKey];
     const prompt = buildPrompt(template, variables);
     return this.callGeneric(prompt, context ?? '');
+  }
+
+  /**
+   * Extract the actual LLM content from the API response.
+   * Handles: { data: { choices: [{ message: { content } }] } } (OpenAI-style)
+   *          { response: "..." }
+   *          { data: "..." }
+   */
+  private extractContent(json: Record<string, unknown>): string {
+    try {
+      // OpenAI-style nested: json.data.choices[0].message.content
+      const data = json['data'] as Record<string, unknown> | undefined;
+      if (data && Array.isArray(data['choices'])) {
+        const choice = (data['choices'] as Record<string, unknown>[])[0];
+        const message = choice?.['message'] as Record<string, unknown> | undefined;
+        if (message?.['content']) return String(message['content']);
+      }
+      // Flat: json.response or json.data (string)
+      if (typeof json['response'] === 'string') return json['response'];
+      if (typeof json['data'] === 'string') return json['data'];
+      return JSON.stringify(json);
+    } catch {
+      return JSON.stringify(json);
+    }
   }
 
   /**
