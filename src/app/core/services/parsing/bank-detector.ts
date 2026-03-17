@@ -63,24 +63,29 @@ const BANK_INDICATORS = [
 export function detectBank(text: string): BankDetection {
   const lower = text.toLowerCase();
 
+  // Use only the first ~1000 chars (header/metadata) for primary detection
+  // to avoid transaction narrations (e.g. "Amex bill payment") triggering wrong bank.
+  const header = lower.substring(0, 1000);
+
   // Sort by priority descending
   const sorted = [...SIGNATURES].sort((a, b) => b.priority - a.priority);
 
+  // Phase 1: Match against header text only
+  for (const sig of sorted) {
+    for (const kw of sig.keywords) {
+      if (header.includes(kw)) {
+        const accountType = resolveAccountType(sig.accountType, lower);
+        return { bank: sig.bank, accountType, confidence: 0.95 };
+      }
+    }
+  }
+
+  // Phase 2: Fall back to full text (for short PDFs or unusual layouts)
   for (const sig of sorted) {
     for (const kw of sig.keywords) {
       if (lower.includes(kw)) {
-        let accountType = sig.accountType;
-
-        // Override with heuristics
-        if (accountType === 'bank' && CARD_INDICATORS.some(ci => lower.includes(ci))) {
-          accountType = 'credit_card';
-        }
-        if (accountType === 'credit_card' && BANK_INDICATORS.some(bi => lower.includes(bi)) &&
-            !CARD_INDICATORS.some(ci => lower.includes(ci))) {
-          accountType = 'bank';
-        }
-
-        return { bank: sig.bank, accountType, confidence: 0.9 };
+        const accountType = resolveAccountType(sig.accountType, lower);
+        return { bank: sig.bank, accountType, confidence: 0.7 };
       }
     }
   }
@@ -92,4 +97,20 @@ export function detectBank(text: string): BankDetection {
     accountType: isCard ? 'credit_card' : 'bank',
     confidence: isCard ? 0.5 : 0.3,
   };
+}
+
+function resolveAccountType(
+  detected: 'bank' | 'credit_card',
+  fullText: string,
+): 'bank' | 'credit_card' {
+  const hasCardIndicators = CARD_INDICATORS.some(ci => fullText.includes(ci));
+  const hasBankIndicators = BANK_INDICATORS.some(bi => fullText.includes(bi));
+
+  if (detected === 'bank' && hasCardIndicators && !hasBankIndicators) {
+    return 'credit_card';
+  }
+  if (detected === 'credit_card' && hasBankIndicators && !hasCardIndicators) {
+    return 'bank';
+  }
+  return detected;
 }
