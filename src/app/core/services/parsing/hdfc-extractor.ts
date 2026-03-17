@@ -23,66 +23,14 @@ interface ColumnBounds {
   balanceX: number;      // left edge of Closing Balance column
 }
 
-/** Patterns to identify HDFC page header lines to skip */
-const HDFC_HEADER_PATTERNS = [
-  /^\s*page\s+no/i,
-  /^\s*account\s+(branch|no|type|status)/i,
-  /^\s*a\/c\s+open/i,
-  /^\s*address/i,
-  /^\s*city/i,
-  /^\s*state/i,
-  /^\s*phone/i,
-  /^\s*email/i,
-  /^\s*cust\s+id/i,
-  /^\s*currency/i,
-  /^\s*rtgs/i,
-  /^\s*branch\s+code/i,
-  /^\s*nomination/i,
-  /^\s*joint\s+holders/i,
-  /^\s*od\s+limit/i,
-  /^\s*micr/i,
-  /^\s*from\s*:\s*\d/i,
-  /^\s*(?:hdfc\s+bank|virtual\s+imperia)/i,
-  /^\s*(?:mr|mrs|ms|dr)\s+/i,
-  /^\s*\d+\s+[a-z]+\s+(?:garden|nagar|colony|road|street|park|layout)/i,
-  /^\s*(?:registered|corporate)\s+office/i,
-  /^\s*(?:contents|closing\s+balance\s+includes)/i,
-  /^\s*state\s+account\s+branch/i,
-  /^\s*hdfc\s+bank\s+gstin/i,
-  /^\s*\*closing/i,
-  /^\s*(?:stellar|sector)\s/i,
-  /^\s*(?:noida|mumbai|delhi|bangalore|chennai|hyderabad|kolkata|pune|agra)\s*\d*/i,
-  /^\s*(?:uttar\s+pradesh|maharashtra|karnataka|tamil\s+nadu)/i,
-  /^\s*\d{6}\s*$/,  // PIN codes
-  /^\s*india\s*$/i,
-  /^\s*\.$/,
-  /^\s*c-\d/i,
-];
-
-function isHdfcHeaderLine(text: string): boolean {
-  const t = text.trim();
-  if (t.length < 2) return true;
-  return HDFC_HEADER_PATTERNS.some(p => p.test(t));
-}
 
 /**
  * Detect column boundaries from HDFC statement header row.
  * Scans for the row containing "Withdrawal" and "Deposit" text items.
  */
 export function detectHdfcColumns(lines: TextLine[]): ColumnBounds | null {
-  // Debug: log first 20 lines to see what we're working with
-  console.log('[HDFC] detectHdfcColumns: scanning', lines.length, 'lines');
-  for (let i = 0; i < Math.min(30, lines.length); i++) {
-    console.log(`[HDFC] line ${i}: "${lines[i].text.substring(0, 120)}"`);
-  }
-
   for (const line of lines) {
     const text = line.text.toLowerCase();
-    // Check for partial matches to understand what's available
-    if (text.includes('withdrawal') || text.includes('deposit') || text.includes('closing')) {
-      console.log('[HDFC] candidate header line:', text.substring(0, 150));
-      console.log('[HDFC] items:', line.items.map(i => `"${i.str}" x=${i.x.toFixed(1)}`).join(' | '));
-    }
     if (text.includes('withdrawal') && text.includes('deposit') && text.includes('closing')) {
       // Found the column header row — extract X positions from items
       let withdrawalX = 0;
@@ -96,14 +44,11 @@ export function detectHdfcColumns(lines: TextLine[]): ColumnBounds | null {
         if (s.includes('closing')) balanceX = item.x;
       }
 
-      console.log('[HDFC] column bounds:', { withdrawalX, depositX, balanceX });
-
       if (withdrawalX > 0 && depositX > 0 && balanceX > 0) {
         return { withdrawalX, depositX, balanceX };
       }
     }
   }
-  console.log('[HDFC] detectHdfcColumns: NO column header found!');
   return null;
 }
 
@@ -142,90 +87,50 @@ function classifyAmountByX(
 export function extractHdfcRows(lines: TextLine[]): RawRow[] {
   const cols = detectHdfcColumns(lines);
   if (!cols) {
-    console.log('[HDFC] extractHdfcRows: no columns detected, returning []');
     return [];
   }
 
-  // Filter out page headers and column header rows
+  // Filter: keep only lines after column header rows (skip page headers)
   const transactionLines = filterTransactionLines(lines);
-  console.log('[HDFC] after filtering:', transactionLines.length, 'lines (from', lines.length, 'total)');
 
   // Group lines into multi-line transactions (date-anchored)
   const groups = groupTransactionLines(transactionLines);
-  console.log('[HDFC] grouped into', groups.length, 'transaction groups');
 
   // Parse each group using column-aware amount classification
   const rows: RawRow[] = [];
-  let skipped = 0;
   for (const group of groups) {
     const row = parseHdfcGroup(group, cols);
-    if (row) {
-      rows.push(row);
-    } else {
-      skipped++;
-      if (skipped <= 5) {
-        console.log('[HDFC] skipped group:', group.map(l => l.text.substring(0, 80)).join(' | '));
-      }
-    }
+    if (row) rows.push(row);
   }
-  console.log('[HDFC] parsed', rows.length, 'rows, skipped', skipped);
 
   return rows;
 }
 
 /**
- * Filter out HDFC page headers — keep only lines between column header rows
- * and page footers that belong to transactions.
+ * Filter lines: include everything after each column header row.
+ * The column header row appears on every page of the HDFC statement.
+ * This is the only reliable signal — no complex pattern matching needed.
  */
 function filterTransactionLines(lines: TextLine[]): TextLine[] {
-  const filtered: TextLine[] = [];
-  let inTransactionZone = false;
+  const result: TextLine[] = [];
+  let seenHeader = false;
 
   for (const line of lines) {
     const text = line.text.trim();
 
-    // Column header row starts the transaction zone
+    // Column header row resets the gate (appears on each page)
     if (isColumnHeaderRow(text)) {
-      inTransactionZone = true;
-      continue; // skip the header row itself
-    }
-
-    // Page header patterns end the transaction zone
-    if (isHdfcHeaderLine(text)) {
-      // If we hit a page header while in transaction zone, we've crossed a page boundary
-      if (inTransactionZone) {
-        inTransactionZone = false;
-      }
-      continue; // skip header lines
-    }
-
-    // Footer patterns
-    if (/^\s*hdfc\s+bank\s+limited/i.test(text) ||
-        /^\s*\*closing\s+balance/i.test(text) ||
-        /^\s*contents\s+of\s+this/i.test(text) ||
-        /^\s*state\s+account\s+branch/i.test(text)) {
+      seenHeader = true;
       continue;
     }
 
-    // If we haven't entered the transaction zone yet on this page, skip
-    // But handle continuation lines from previous page
-    if (!inTransactionZone) {
-      // Check if this looks like a continuation of a transaction (not a header)
-      if (!isHdfcHeaderLine(text) && text.length > 2) {
-        // Could be a continuation line from previous page's last transaction
-        // Only include if it doesn't look like address/account info
-        if (startsWithDate(text) || filtered.length > 0) {
-          inTransactionZone = true;
-          filtered.push(line);
-        }
-      }
-      continue;
-    }
+    if (!seenHeader) continue;
+    if (text.length < 2) continue;
 
-    filtered.push(line);
+    result.push(line);
   }
 
-  return filtered;
+  return result;
 }
 
 /**
