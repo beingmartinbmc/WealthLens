@@ -70,8 +70,19 @@ function isHdfcHeaderLine(text: string): boolean {
  * Scans for the row containing "Withdrawal" and "Deposit" text items.
  */
 export function detectHdfcColumns(lines: TextLine[]): ColumnBounds | null {
+  // Debug: log first 20 lines to see what we're working with
+  console.log('[HDFC] detectHdfcColumns: scanning', lines.length, 'lines');
+  for (let i = 0; i < Math.min(30, lines.length); i++) {
+    console.log(`[HDFC] line ${i}: "${lines[i].text.substring(0, 120)}"`);
+  }
+
   for (const line of lines) {
     const text = line.text.toLowerCase();
+    // Check for partial matches to understand what's available
+    if (text.includes('withdrawal') || text.includes('deposit') || text.includes('closing')) {
+      console.log('[HDFC] candidate header line:', text.substring(0, 150));
+      console.log('[HDFC] items:', line.items.map(i => `"${i.str}" x=${i.x.toFixed(1)}`).join(' | '));
+    }
     if (text.includes('withdrawal') && text.includes('deposit') && text.includes('closing')) {
       // Found the column header row — extract X positions from items
       let withdrawalX = 0;
@@ -85,11 +96,14 @@ export function detectHdfcColumns(lines: TextLine[]): ColumnBounds | null {
         if (s.includes('closing')) balanceX = item.x;
       }
 
+      console.log('[HDFC] column bounds:', { withdrawalX, depositX, balanceX });
+
       if (withdrawalX > 0 && depositX > 0 && balanceX > 0) {
         return { withdrawalX, depositX, balanceX };
       }
     }
   }
+  console.log('[HDFC] detectHdfcColumns: NO column header found!');
   return null;
 }
 
@@ -128,22 +142,33 @@ function classifyAmountByX(
 export function extractHdfcRows(lines: TextLine[]): RawRow[] {
   const cols = detectHdfcColumns(lines);
   if (!cols) {
-    // Couldn't find column headers — fall back to generic extraction
+    console.log('[HDFC] extractHdfcRows: no columns detected, returning []');
     return [];
   }
 
   // Filter out page headers and column header rows
   const transactionLines = filterTransactionLines(lines);
+  console.log('[HDFC] after filtering:', transactionLines.length, 'lines (from', lines.length, 'total)');
 
   // Group lines into multi-line transactions (date-anchored)
   const groups = groupTransactionLines(transactionLines);
+  console.log('[HDFC] grouped into', groups.length, 'transaction groups');
 
   // Parse each group using column-aware amount classification
   const rows: RawRow[] = [];
+  let skipped = 0;
   for (const group of groups) {
     const row = parseHdfcGroup(group, cols);
-    if (row) rows.push(row);
+    if (row) {
+      rows.push(row);
+    } else {
+      skipped++;
+      if (skipped <= 5) {
+        console.log('[HDFC] skipped group:', group.map(l => l.text.substring(0, 80)).join(' | '));
+      }
+    }
   }
+  console.log('[HDFC] parsed', rows.length, 'rows, skipped', skipped);
 
   return rows;
 }
