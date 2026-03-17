@@ -34,7 +34,7 @@ export class PdfParserService {
       const flatText = await extractPdfFlatText(arrayBuffer);
       const detection = detectBank(flatText);
       const detectedBank = detection.bank;
-      const bankName = accountName || detectedBank;
+      let bankName = accountName || detectedBank;
       const accountType = detection.accountType;
 
       // Step 2: Position-aware line extraction
@@ -42,14 +42,17 @@ export class PdfParserService {
       try {
         const lines = await extractPdfLines(arrayBuffer);
 
-        // Use HDFC-specific extractor when HDFC is detected (always use detectedBank, not user-provided name)
-        if (detectedBank.toUpperCase().includes('HDFC') && accountType === 'bank') {
-          rows = extractHdfcRows(lines);
-          // Fall back to generic if HDFC extractor found nothing
-          if (rows.length === 0) {
-            rows = extractRows(lines);
-          }
-        } else {
+        // Try HDFC-specific extractor first — it self-detects via column headers
+        // (returns [] if it doesn't find HDFC column layout)
+        rows = extractHdfcRows(lines);
+
+        if (rows.length > 0 && !bankName.toUpperCase().includes('HDFC')) {
+          // HDFC format detected but bank name wasn't set — override it
+          bankName = detectedBank.toUpperCase().includes('HDFC') ? detectedBank : 'HDFC Bank';
+        }
+
+        // Fall back to generic extractor
+        if (rows.length === 0) {
           rows = extractRows(lines);
         }
       } catch {

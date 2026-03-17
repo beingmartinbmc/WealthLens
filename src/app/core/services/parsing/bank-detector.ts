@@ -63,40 +63,44 @@ const BANK_INDICATORS = [
 export function detectBank(text: string): BankDetection {
   const lower = text.toLowerCase();
 
-  // Use only the first ~1000 chars (header/metadata) for primary detection
-  // to avoid transaction narrations (e.g. "Amex bill payment") triggering wrong bank.
-  const header = lower.substring(0, 1000);
+  // Score each signature by counting keyword occurrences in the full text.
+  // A bank statement will mention its own bank name many more times
+  // (IFSC codes, header, footer, narrations) than a merchant name that
+  // happens to appear in a single transaction (e.g. "Amex bill payment").
+  const scores: { sig: BankSignature; score: number }[] = [];
 
-  // Sort by priority descending
-  const sorted = [...SIGNATURES].sort((a, b) => b.priority - a.priority);
-
-  // Phase 1: Match against header text only
-  for (const sig of sorted) {
+  for (const sig of SIGNATURES) {
+    let score = 0;
     for (const kw of sig.keywords) {
-      if (header.includes(kw)) {
-        const accountType = resolveAccountType(sig.accountType, lower);
-        return { bank: sig.bank, accountType, confidence: 0.95 };
+      // Count all occurrences of this keyword
+      let idx = 0;
+      while ((idx = lower.indexOf(kw, idx)) !== -1) {
+        score++;
+        idx += kw.length;
       }
+    }
+    if (score > 0) {
+      scores.push({ sig, score });
     }
   }
 
-  // Phase 2: Fall back to full text (for short PDFs or unusual layouts)
-  for (const sig of sorted) {
-    for (const kw of sig.keywords) {
-      if (lower.includes(kw)) {
-        const accountType = resolveAccountType(sig.accountType, lower);
-        return { bank: sig.bank, accountType, confidence: 0.7 };
-      }
-    }
+  if (scores.length === 0) {
+    const isCard = CARD_INDICATORS.some(ci => lower.includes(ci));
+    return {
+      bank: 'Unknown',
+      accountType: isCard ? 'credit_card' : 'bank',
+      confidence: isCard ? 0.5 : 0.3,
+    };
   }
 
-  // Fallback: try to at least detect bank vs card
-  const isCard = CARD_INDICATORS.some(ci => lower.includes(ci));
-  return {
-    bank: 'Unknown',
-    accountType: isCard ? 'credit_card' : 'bank',
-    confidence: isCard ? 0.5 : 0.3,
-  };
+  // Sort by score descending, then priority descending for ties
+  scores.sort((a, b) => b.score - a.score || b.sig.priority - a.sig.priority);
+
+  const best = scores[0];
+  const accountType = resolveAccountType(best.sig.accountType, lower);
+  const confidence = best.score >= 3 ? 0.95 : best.score >= 2 ? 0.8 : 0.6;
+
+  return { bank: best.sig.bank, accountType, confidence };
 }
 
 function resolveAccountType(
