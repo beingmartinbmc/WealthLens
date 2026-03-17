@@ -33,7 +33,8 @@ export class PdfParserService {
       // Step 1: Detect bank & account type from flat text (fast scan)
       const flatText = await extractPdfFlatText(arrayBuffer);
       const detection = detectBank(flatText);
-      const bankName = accountName || detection.bank;
+      const detectedBank = detection.bank;
+      const bankName = accountName || detectedBank;
       const accountType = detection.accountType;
 
       // Step 2: Position-aware line extraction
@@ -41,8 +42,8 @@ export class PdfParserService {
       try {
         const lines = await extractPdfLines(arrayBuffer);
 
-        // Use HDFC-specific extractor when HDFC is detected
-        if (bankName.toUpperCase().includes('HDFC') && accountType === 'bank') {
+        // Use HDFC-specific extractor when HDFC is detected (always use detectedBank, not user-provided name)
+        if (detectedBank.toUpperCase().includes('HDFC') && accountType === 'bank') {
           rows = extractHdfcRows(lines);
           // Fall back to generic if HDFC extractor found nothing
           if (rows.length === 0) {

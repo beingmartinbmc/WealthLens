@@ -20,7 +20,7 @@ export class AnalyticsService {
       ? transactions.filter(t => {
           const d = new Date(t.date);
           const diff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-          return diff < months;
+          return diff <= months;
         })
       : transactions;
 

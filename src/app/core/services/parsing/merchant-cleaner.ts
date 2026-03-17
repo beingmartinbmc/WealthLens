@@ -53,6 +53,19 @@ const KNOWN_MERCHANTS: [RegExp, string][] = [
   [/\bjio\b/i, 'Jio'],
   [/\bairtel\b/i, 'Airtel'],
   [/\bcult\.?fit\b/i, 'Cult.fit'],
+  [/\bjar\b|jarretail/i, 'Jar (Gold)'],
+  [/\bindmoney/i, 'INDmoney'],
+  [/\bfinzoom/i, 'Finzoom Investment'],
+  [/\bsmallcase/i, 'Smallcase'],
+  [/\bbirla\s*sun/i, 'Birla SunLife'],
+  [/\bmeesho\b/i, 'Meesho'],
+  [/\byescred/i, 'CRED'],
+  [/\bpaid\s*via\s*cred/i, 'CRED'],
+  [/\bslice\b/i, 'Slice'],
+  [/\blazypay\b/i, 'LazyPay'],
+  [/\bsimpl\b/i, 'Simpl'],
+  [/\bapple\s*media|appleservices/i, 'Apple Services'],
+  [/\bdc\s*intl\s*atm/i, 'International ATM'],
 ];
 
 const PAYMENT_PREFIXES = [

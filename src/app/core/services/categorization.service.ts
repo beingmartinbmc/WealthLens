@@ -15,7 +15,9 @@ const CATEGORY_RULES: CategoryRule[] = [
       'coffee', 'starbucks', 'mcdonalds', 'kfc', 'burger', 'food', 'dining',
       'bakery', 'biryani', 'kitchen', 'dhaba', 'meals', 'lunch', 'dinner',
       'breakfast', 'snacks', 'barbeque', 'freshmen', 'dunzo', 'blinkit',
-      'zepto', 'bigbasket', 'grofers', 'instamart',
+      'zepto', 'bigbasket', 'grofers', 'instamart', 'eatsure', 'faasos',
+      'behrouz', 'box8', 'licious', 'freshmenu', 'eatfit', 'rebel foods',
+      'chaayos', 'haldiram', 'mtr ', 'baskin', 'natural ice',
     ],
     category: 'food',
   },
@@ -46,10 +48,12 @@ const CATEGORY_RULES: CategoryRule[] = [
   // Subscriptions
   {
     keywords: [
-      'netflix', 'hotstar', 'prime video', 'spotify', 'apple', 'google storage',
+      'netflix', 'hotstar', 'prime video', 'spotify', 'apple media',
+      'apple.com', 'appleservices', 'google storage', 'google play',
       'youtube premium', 'jio', 'airtel', 'vi ', 'bsnl', 'notion', 'chatgpt',
       'openai', 'github', 'adobe', 'microsoft', 'linkedin premium', 'medium',
-      'subscription', 'renewal', 'recurring',
+      'subscription', 'renewal', 'recurring', 'upi mandate',
+      'autopay', 'auto pay', 'si-', 'standing instruction',
     ],
     category: 'subscriptions',
   },
@@ -57,7 +61,8 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     keywords: [
       'salary', 'payroll', 'stipend', 'freelance', 'payment received',
-      'credit interest', 'dividend', 'cashback', 'refund', 'reimbursement',
+      'credit interest', 'int.pd', 'dividend', 'cashback', 'refund', 'reimbursement',
+      'neft cr', 'credited', 'employer',
     ],
     category: 'salary',
   },
@@ -101,14 +106,18 @@ const CATEGORY_RULES: CategoryRule[] = [
       'mutual fund', 'sip', 'zerodha', 'groww', 'kuvera', 'coin',
       'nps', 'ppf', 'fd ', 'fixed deposit', 'stocks', 'shares',
       'lic', 'investment', 'mf ', 'nifty', 'sensex',
+      'jar', 'jarretail', 'indmoney', 'smallcase', 'finzoom',
+      'birla sunlife', 'birla sun', 'ach d-', 'ach c-',
+      'sbi mf', 'hdfc mf', 'icici pru', 'axis mf', 'dsp ',
+      'gold will be', 'gold purchase', 'digital gold',
     ],
     category: 'investment',
   },
-  // Transfer
+  // Transfer (note: 'upi' removed — it's a payment method, not a category)
   {
     keywords: [
-      'neft', 'rtgs', 'imps', 'upi', 'transfer to', 'transfer from',
-      'self transfer', 'fund transfer',
+      'neft', 'rtgs', 'imps', 'transfer to', 'transfer from',
+      'self transfer', 'fund transfer', 'own account',
     ],
     category: 'transfer',
   },
