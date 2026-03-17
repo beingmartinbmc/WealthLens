@@ -9,6 +9,7 @@ import {
   detectBank,
   extractRows,
   extractRowsFromText,
+  extractHdfcRows,
   refineBankRows,
   inferTypesFromBalance,
   cleanMerchant,
@@ -39,7 +40,17 @@ export class PdfParserService {
       let rows: RawRow[];
       try {
         const lines = await extractPdfLines(arrayBuffer);
-        rows = extractRows(lines);
+
+        // Use HDFC-specific extractor when HDFC is detected
+        if (bankName.toUpperCase().includes('HDFC') && accountType === 'bank') {
+          rows = extractHdfcRows(lines);
+          // Fall back to generic if HDFC extractor found nothing
+          if (rows.length === 0) {
+            rows = extractRows(lines);
+          }
+        } else {
+          rows = extractRows(lines);
+        }
       } catch {
         // Fallback to flat text extraction
         rows = extractRowsFromText(flatText);
