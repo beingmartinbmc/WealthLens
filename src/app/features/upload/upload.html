@@ -1,0 +1,132 @@
+<div class="upload-page">
+  <div class="page-header">
+    <h1>Upload Statements</h1>
+    <p class="subtitle">Upload your bank or credit card statements (PDF/CSV) to get started</p>
+  </div>
+
+  <!-- Drop Zone -->
+  <div
+    class="drop-zone"
+    [class.dragging]="isDragging()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+    (click)="fileInput.click()"
+  >
+    <input
+      #fileInput
+      type="file"
+      accept=".pdf,.csv"
+      multiple
+      hidden
+      (change)="onFileSelect($event)"
+    />
+    <div class="drop-zone-content">
+      <span class="drop-icon">📂</span>
+      <h3>Drag & drop files here</h3>
+      <p>or click to browse</p>
+      <span class="supported-formats">Supports PDF and CSV formats</span>
+    </div>
+  </div>
+
+  <!-- File List -->
+  @if (files().length > 0) {
+    <div class="file-list">
+      <div class="file-list-header">
+        <h2>Files ({{ files().length }})</h2>
+        <div class="file-actions">
+          @if (!allDone()) {
+            <button class="btn btn-primary" (click)="parseAll()">
+              Parse All
+            </button>
+          }
+          @if (allDone() && totalTransactions() > 0) {
+            <button class="btn btn-success" (click)="saveAndContinue()">
+              Save & View Dashboard ({{ totalTransactions() }} transactions)
+            </button>
+          }
+        </div>
+      </div>
+
+      @for (fileEntry of files(); track $index) {
+        <div class="file-card" [class]="'status-' + fileEntry.status">
+          <div class="file-info">
+            <span class="file-icon">{{ getFileIcon(fileEntry.file.name) }}</span>
+            <div class="file-details">
+              <span class="file-name">{{ fileEntry.file.name }}</span>
+              <span class="file-size">{{ formatFileSize(fileEntry.file.size) }}</span>
+            </div>
+          </div>
+
+          <div class="file-account">
+            <input
+              type="text"
+              class="account-input"
+              placeholder="Account name (optional)"
+              [ngModel]="fileEntry.accountName"
+              (ngModelChange)="fileEntry.accountName = $event"
+              [disabled]="fileEntry.status !== 'pending'"
+            />
+          </div>
+
+          <div class="file-status">
+            @switch (fileEntry.status) {
+              @case ('pending') {
+                <span class="badge badge-pending">Pending</span>
+              }
+              @case ('parsing') {
+                <span class="badge badge-parsing">
+                  <span class="spinner"></span> Parsing...
+                </span>
+              }
+              @case ('done') {
+                <span class="badge badge-done">
+                  ✅ {{ fileEntry.result?.transactions?.length }} transactions
+                </span>
+              }
+              @case ('error') {
+                <span class="badge badge-error" [title]="fileEntry.error || ''">
+                  ❌ Error
+                </span>
+              }
+            }
+          </div>
+
+          <div class="file-remove">
+            @if (fileEntry.status === 'pending') {
+              <button class="btn-icon" (click)="removeFile($index)">✕</button>
+            }
+          </div>
+        </div>
+
+        @if (fileEntry.status === 'error' && fileEntry.error) {
+          <div class="error-detail">
+            {{ fileEntry.error }}
+          </div>
+        }
+
+        @if (fileEntry.status === 'done' && fileEntry.result) {
+          <div class="parse-summary">
+            <span>🏦 {{ fileEntry.result.account }} ({{ fileEntry.result.accountType === 'credit_card' ? 'Credit Card' : 'Bank' }})</span>
+            <span>📅 {{ fileEntry.result.transactions.length }} transactions parsed</span>
+            @if (fileEntry.result.duplicatesRemoved > 0) {
+              <span class="info">🔁 {{ fileEntry.result.duplicatesRemoved }} duplicates removed</span>
+            }
+            @if (fileEntry.result.errors.length > 0) {
+              <span class="warning">⚠️ {{ fileEntry.result.errors.length }} warnings</span>
+            }
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <!-- Privacy Notice -->
+  <div class="privacy-notice">
+    <span class="privacy-icon">🔒</span>
+    <div>
+      <strong>Your data stays private</strong>
+      <p>All parsing happens in your browser. Raw files are not stored — only extracted transactions are saved locally in IndexedDB.</p>
+    </div>
+  </div>
+</div>

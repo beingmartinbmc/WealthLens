@@ -1,0 +1,133 @@
+<div class="insights-page">
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner-large"></div>
+      <p>Analyzing your transactions...</p>
+    </div>
+  } @else if (insights().length === 0 && anomalies().length === 0 && subscriptions().length === 0) {
+    <div class="empty-state">
+      <span class="empty-icon">🚨</span>
+      <h2>No Insights Yet</h2>
+      <p>Upload your bank statements to get personalized insights</p>
+      <button class="btn btn-primary" (click)="goToUpload()">Upload Statements</button>
+    </div>
+  } @else {
+    <div class="page-header">
+      <h1>Insights & Alerts</h1>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button [class.active]="activeTab() === 'insights'" (click)="setTab('insights')">
+        💡 Insights ({{ insights().length }})
+      </button>
+      <button [class.active]="activeTab() === 'anomalies'" (click)="setTab('anomalies')">
+        🚨 Anomalies ({{ anomalies().length }})
+      </button>
+      <button [class.active]="activeTab() === 'subscriptions'" (click)="setTab('subscriptions')">
+        🔄 Subscriptions ({{ subscriptions().length }})
+      </button>
+    </div>
+
+    <!-- Insights Tab -->
+    @if (activeTab() === 'insights') {
+      <div class="card-list">
+        @for (insight of insights(); track insight.id) {
+          <div class="insight-card">
+            <div class="card-header">
+              <span class="priority-dot" [style.background]="getPriorityColor(insight.priority)"></span>
+              <h3>{{ insight.title }}</h3>
+              <span class="priority-badge" [style.color]="getPriorityColor(insight.priority)">
+                {{ insight.priority }}
+              </span>
+            </div>
+            <p class="card-message">{{ insight.message }}</p>
+            @if (insight.amount) {
+              <span class="card-amount">{{ formatCurrency(insight.amount) }}</span>
+            }
+            @if (insight.percentChange) {
+              <span class="card-change" [class.positive]="insight.percentChange < 0" [class.negative]="insight.percentChange > 0">
+                {{ insight.percentChange > 0 ? '+' : '' }}{{ insight.percentChange | number:'1.0-1' }}%
+              </span>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Anomalies Tab -->
+    @if (activeTab() === 'anomalies') {
+      <div class="card-list">
+        @if (anomalies().length === 0) {
+          <div class="no-items">
+            <span>✅</span>
+            <p>No anomalies detected. Your transactions look clean!</p>
+          </div>
+        }
+        @for (anomaly of anomalies(); track anomaly.id) {
+          <div class="anomaly-card" [class]="'type-' + anomaly.type">
+            <div class="card-header">
+              <span class="anomaly-icon">
+                @switch (anomaly.type) {
+                  @case ('duplicate') { 📋 }
+                  @case ('anomaly') { ⚠️ }
+                  @case ('subscription') { 🔄 }
+                }
+              </span>
+              <div class="anomaly-info">
+                <span class="anomaly-type">{{ anomaly.type | titlecase }}</span>
+                <span class="anomaly-confidence">
+                  Confidence: {{ getConfidenceLabel(anomaly.confidence) }}
+                </span>
+              </div>
+              @if (anomaly.amount) {
+                <span class="card-amount">{{ formatCurrency(anomaly.amount) }}</span>
+              }
+            </div>
+            <p class="card-message">{{ anomaly.message }}</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Subscriptions Tab -->
+    @if (activeTab() === 'subscriptions') {
+      @if (subscriptions().length > 0) {
+        <div class="subscription-summary">
+          <div class="sub-total">
+            <span class="sub-total-label">Estimated Monthly Cost</span>
+            <span class="sub-total-value">{{ formatCurrency(getTotalSubscriptionCost()) }}</span>
+          </div>
+        </div>
+      }
+      <div class="card-list">
+        @if (subscriptions().length === 0) {
+          <div class="no-items">
+            <span>🔍</span>
+            <p>No recurring subscriptions detected yet.</p>
+          </div>
+        }
+        @for (sub of subscriptions(); track sub.merchant) {
+          <div class="subscription-card">
+            <div class="card-header">
+              <div class="sub-info">
+                <h3>{{ sub.merchant }}</h3>
+                <span class="sub-frequency">{{ getFrequencyLabel(sub.frequency) }}</span>
+              </div>
+              <div class="sub-amount">
+                <span class="amount">{{ formatCurrency(sub.amount) }}</span>
+                <span class="sub-status" [class.active]="sub.isActive">
+                  {{ sub.isActive ? 'Active' : 'Inactive' }}
+                </span>
+              </div>
+            </div>
+            <div class="sub-meta">
+              <span>Last charged: {{ sub.lastCharge }}</span>
+              <span>{{ sub.transactionIds.length }} occurrences</span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

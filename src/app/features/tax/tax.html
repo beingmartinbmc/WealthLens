@@ -1,0 +1,88 @@
+<div class="tax-page">
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner-large"></div>
+      <p>Computing tax insights...</p>
+    </div>
+  } @else if (!hasData()) {
+    <div class="empty-state">
+      <span class="empty-icon">🧾</span>
+      <h2>No Data Yet</h2>
+      <p>Upload statements to see tax insights</p>
+      <button class="btn btn-primary" (click)="goToUpload()">Upload Statements</button>
+    </div>
+  } @else if (taxInsight(); as tax) {
+    <div class="page-header">
+      <h1>Tax Insights</h1>
+      <span class="disclaimer">India-focused · Estimates only · Consult a CA for actual filing</span>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="tax-metrics">
+      <div class="tax-card">
+        <span class="tax-icon">💰</span>
+        <div class="tax-info">
+          <span class="tax-label">Salary Credits</span>
+          <span class="tax-value">{{ formatCurrency(tax.salaryCredits) }}</span>
+        </div>
+      </div>
+      <div class="tax-card">
+        <span class="tax-icon">🏠</span>
+        <div class="tax-info">
+          <span class="tax-label">Rent Payments</span>
+          <span class="tax-value">{{ formatCurrency(tax.rentPayments) }}</span>
+        </div>
+      </div>
+      <div class="tax-card">
+        <span class="tax-icon">📈</span>
+        <div class="tax-info">
+          <span class="tax-label">Investment Transactions</span>
+          <span class="tax-value">{{ formatCurrency(tax.investmentTransactions) }}</span>
+        </div>
+      </div>
+      <div class="tax-card highlight">
+        <span class="tax-icon">🧮</span>
+        <div class="tax-info">
+          <span class="tax-label">Est. Taxable Income (After Deductions)</span>
+          <span class="tax-value">{{ formatCurrency(getEstimatedTaxable()) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deductions -->
+    <div class="deductions-section">
+      <h2>Possible Deductions</h2>
+      @if (tax.possibleDeductions.length === 0) {
+        <div class="no-deductions">
+          <p>No deductions detected from your transactions. Consider investing in tax-saving instruments.</p>
+        </div>
+      } @else {
+        <div class="deductions-list">
+          @for (deduction of tax.possibleDeductions; track deduction.section) {
+            <div class="deduction-card">
+              <div class="deduction-header">
+                <span class="deduction-section">Section {{ deduction.section }}</span>
+                <span class="deduction-amount">{{ formatCurrency(deduction.amount) }}</span>
+              </div>
+              <p class="deduction-desc">{{ deduction.description }}</p>
+            </div>
+          }
+        </div>
+
+        <div class="deductions-total">
+          <span>Total Possible Deductions</span>
+          <span class="total-value">{{ formatCurrency(getTotalDeductions()) }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="tax-disclaimer">
+      <span class="disclaimer-icon">⚠️</span>
+      <div>
+        <strong>Disclaimer</strong>
+        <p>These are estimated figures based on transaction patterns. They are NOT official tax computations. Please consult a qualified Chartered Accountant for actual tax filing. Tax laws and rates are subject to change.</p>
+      </div>
+    </div>
+  }
+</div>

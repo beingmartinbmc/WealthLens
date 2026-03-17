@@ -1,0 +1,212 @@
+<div class="dashboard-page">
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner-large"></div>
+      <p>Loading your financial data...</p>
+    </div>
+  } @else if (!hasData()) {
+    <div class="empty-state">
+      <span class="empty-icon">📊</span>
+      <h2>No Data Yet</h2>
+      <p>Upload your bank statements to see your financial dashboard</p>
+      <button class="btn btn-primary" (click)="goToUpload()">Upload Statements</button>
+    </div>
+  } @else {
+    <!-- Period Selector -->
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <div class="period-selector">
+        <button [class.active]="selectedPeriod() === 0" (click)="setPeriod(0)">All Time</button>
+        <button [class.active]="selectedPeriod() === 3" (click)="setPeriod(3)">3 Months</button>
+        <button [class.active]="selectedPeriod() === 6" (click)="setPeriod(6)">6 Months</button>
+        <button [class.active]="selectedPeriod() === 12" (click)="setPeriod(12)">12 Months</button>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    @if (summary(); as s) {
+      <div class="metrics-grid">
+        <div class="metric-card income">
+          <div class="metric-icon">💰</div>
+          <div class="metric-content">
+            <span class="metric-label">Total Income</span>
+            <span class="metric-value">{{ formatCurrency(s.totalIncome) }}</span>
+          </div>
+        </div>
+        <div class="metric-card expense">
+          <div class="metric-icon">💸</div>
+          <div class="metric-content">
+            <span class="metric-label">Total Expenses</span>
+            <span class="metric-value">{{ formatCurrency(s.totalExpenses) }}</span>
+          </div>
+        </div>
+        <div class="metric-card savings">
+          <div class="metric-icon">🏦</div>
+          <div class="metric-content">
+            <span class="metric-label">Net Savings</span>
+            <span class="metric-value" [class.negative]="s.netSavings < 0">
+              {{ formatCurrency(s.netSavings) }}
+            </span>
+          </div>
+        </div>
+        <div class="metric-card rate">
+          <div class="metric-icon">📈</div>
+          <div class="metric-content">
+            <span class="metric-label">Savings Rate</span>
+            <span class="metric-value">{{ s.savingsRate }}%</span>
+          </div>
+        </div>
+        <div class="metric-card burn">
+          <div class="metric-icon">🔥</div>
+          <div class="metric-content">
+            <span class="metric-label">Monthly Burn Rate</span>
+            <span class="metric-value">{{ formatCurrency(s.monthlyBurnRate) }}</span>
+          </div>
+        </div>
+        @if (healthScore(); as h) {
+          <div class="metric-card health">
+            <div class="metric-icon">❤️</div>
+            <div class="metric-content">
+              <span class="metric-label">Financial Health</span>
+              <span class="metric-value" [style.color]="getHealthScoreColor(h.score)">
+                {{ h.score }}/100
+              </span>
+              <span class="metric-sub" [style.color]="getHealthScoreColor(h.score)">
+                {{ getHealthScoreLabel(h.score) }}
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Charts Section -->
+      <div class="charts-grid">
+        <!-- Cashflow Chart -->
+        <div class="chart-card wide">
+          <h3>Monthly Cashflow</h3>
+          <div class="bar-chart">
+            <div class="chart-bars">
+              @for (month of s.monthOverMonth; track month.month) {
+                <div class="bar-group">
+                  <div class="bars">
+                    <div
+                      class="bar income-bar"
+                      [style.height.%]="getBarHeight(month.income, maxMonthlyExpense())"
+                      [title]="'Income: ' + formatCurrency(month.income)"
+                    ></div>
+                    <div
+                      class="bar expense-bar"
+                      [style.height.%]="getBarHeight(month.expenses, maxMonthlyExpense())"
+                      [title]="'Expenses: ' + formatCurrency(month.expenses)"
+                    ></div>
+                  </div>
+                  <span class="bar-label">{{ getMonthLabel(month.month) }}</span>
+                </div>
+              }
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="dot income-dot"></span> Income</span>
+              <span class="legend-item"><span class="dot expense-dot"></span> Expenses</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Breakdown -->
+        <div class="chart-card">
+          <h3>Spending by Category</h3>
+          <div class="category-list">
+            @for (cat of categoryBreakdown(); track cat.category) {
+              <div class="category-row">
+                <div class="category-info">
+                  <span class="category-color" [style.background]="cat.color"></span>
+                  <span class="category-name">{{ cat.label }}</span>
+                </div>
+                <div class="category-bar-wrapper">
+                  <div
+                    class="category-bar"
+                    [style.width.%]="getCategoryPercentage(cat.amount)"
+                    [style.background]="cat.color"
+                  ></div>
+                </div>
+                <span class="category-amount">{{ formatCurrency(cat.amount) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Monthly Savings Trend -->
+        <div class="chart-card">
+          <h3>Monthly Savings</h3>
+          <div class="savings-list">
+            @for (month of s.monthOverMonth; track month.month) {
+              <div class="savings-row">
+                <span class="savings-month">{{ getMonthLabel(month.month) }}</span>
+                <div class="savings-bar-wrapper">
+                  @if (month.savings >= 0) {
+                    <div
+                      class="savings-bar positive"
+                      [style.width.%]="getBarHeight(month.savings, maxMonthlyExpense())"
+                    ></div>
+                  } @else {
+                    <div
+                      class="savings-bar negative"
+                      [style.width.%]="getBarHeight(-month.savings, maxMonthlyExpense())"
+                    ></div>
+                  }
+                </div>
+                <span class="savings-amount" [class.negative]="month.savings < 0">
+                  {{ formatCurrency(month.savings) }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Health Score Breakdown -->
+      @if (healthScore(); as h) {
+        <div class="health-section">
+          <h3>Financial Health Breakdown</h3>
+          <div class="health-grid">
+            <div class="health-item">
+              <span class="health-label">Savings Rate</span>
+              <div class="health-bar-wrapper">
+                <div class="health-bar" [style.width.%]="(h.breakdown.savingsRate / 30) * 100" style="background: #6C5CE7"></div>
+              </div>
+              <span class="health-score">{{ h.breakdown.savingsRate }}/30</span>
+            </div>
+            <div class="health-item">
+              <span class="health-label">Expense Stability</span>
+              <div class="health-bar-wrapper">
+                <div class="health-bar" [style.width.%]="(h.breakdown.expenseStability / 25) * 100" style="background: #00B894"></div>
+              </div>
+              <span class="health-score">{{ h.breakdown.expenseStability }}/25</span>
+            </div>
+            <div class="health-item">
+              <span class="health-label">Debt Management</span>
+              <div class="health-bar-wrapper">
+                <div class="health-bar" [style.width.%]="(h.breakdown.debtRatio / 20) * 100" style="background: #E17055"></div>
+              </div>
+              <span class="health-score">{{ h.breakdown.debtRatio }}/20</span>
+            </div>
+            <div class="health-item">
+              <span class="health-label">Diversification</span>
+              <div class="health-bar-wrapper">
+                <div class="health-bar" [style.width.%]="(h.breakdown.diversification / 25) * 100" style="background: #45B7D1"></div>
+              </div>
+              <span class="health-score">{{ h.breakdown.diversification }}/25</span>
+            </div>
+          </div>
+          @if (h.tips.length > 0) {
+            <div class="health-tips">
+              <h4>Tips to Improve</h4>
+              @for (tip of h.tips; track $index) {
+                <div class="tip">💡 {{ tip }}</div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+</div>

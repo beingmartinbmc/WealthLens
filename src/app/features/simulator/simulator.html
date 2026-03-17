@@ -1,0 +1,140 @@
+<div class="simulator-page">
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner-large"></div>
+      <p>Loading simulation data...</p>
+    </div>
+  } @else if (transactions().length === 0) {
+    <div class="empty-state">
+      <span class="empty-icon">🔮</span>
+      <h2>No Data Yet</h2>
+      <p>Upload statements to run financial simulations</p>
+      <button class="btn btn-primary" (click)="goToUpload()">Upload Statements</button>
+    </div>
+  } @else {
+    <div class="page-header">
+      <h1>Financial Simulator</h1>
+      <button class="btn btn-outline" (click)="resetAll()">Reset All</button>
+    </div>
+
+    <div class="simulator-layout">
+      <!-- Controls -->
+      <div class="controls-panel">
+        <div class="control-section">
+          <h3>Projection Period</h3>
+          <div class="slider-group">
+            <input
+              type="range"
+              min="3"
+              max="24"
+              [ngModel]="monthsAhead()"
+              (ngModelChange)="onMonthsChange($event)"
+            />
+            <span class="slider-value">{{ monthsAhead() }} months</span>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Income Adjustment</h3>
+          <div class="slider-group">
+            <input
+              type="range"
+              min="-50"
+              max="100"
+              [ngModel]="incomeChange()"
+              (ngModelChange)="onIncomeChange($event)"
+            />
+            <span class="slider-value" [class.positive]="incomeChange() > 0" [class.negative]="incomeChange() < 0">
+              {{ incomeChange() > 0 ? '+' : '' }}{{ incomeChange() }}%
+            </span>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Category Adjustments</h3>
+          @for (cat of categoryAdjustments(); track cat.category; let i = $index) {
+            <div class="category-control">
+              <div class="category-header">
+                <span class="cat-label">{{ cat.label }}</span>
+                <span class="cat-current">₹{{ cat.currentAmount.toLocaleString('en-IN') }}/mo</span>
+              </div>
+              <div class="slider-group">
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  [ngModel]="cat.changePercent"
+                  (ngModelChange)="onCategoryChange(i, $event)"
+                />
+                <span class="slider-value" [class.positive]="cat.changePercent < 0" [class.negative]="cat.changePercent > 0">
+                  {{ cat.changePercent > 0 ? '+' : '' }}{{ cat.changePercent }}%
+                </span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Projection Results -->
+      <div class="results-panel">
+        <div class="result-metrics">
+          <div class="result-card">
+            <span class="result-label">Projected Savings</span>
+            <span class="result-value" [class.negative]="getProjectedSavingsTotal() < 0">
+              {{ formatCurrency(getProjectedSavingsTotal()) }}
+            </span>
+            <span class="result-period">over {{ monthsAhead() }} months</span>
+          </div>
+          <div class="result-card">
+            <span class="result-label">End Balance</span>
+            <span class="result-value" [class.negative]="getEndBalance() < 0">
+              {{ formatCurrency(getEndBalance()) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="projection-chart">
+          <h3>Balance Projection</h3>
+          <div class="chart-area">
+            @for (month of projectedMonths(); track month.month) {
+              <div class="proj-bar-group">
+                <div class="proj-bar-wrapper">
+                  <div
+                    class="proj-bar"
+                    [class.positive]="month.balance >= 0"
+                    [class.negative]="month.balance < 0"
+                    [style.height.%]="getBarHeight(month.balance)"
+                    [title]="getMonthLabel(month.month) + ': ' + formatCurrency(month.balance)"
+                  ></div>
+                </div>
+                <span class="proj-label">{{ getMonthLabel(month.month) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="monthly-details">
+          <h3>Monthly Breakdown</h3>
+          <div class="details-table">
+            <div class="table-header">
+              <span>Month</span>
+              <span>Expenses</span>
+              <span>Savings</span>
+              <span>Balance</span>
+            </div>
+            @for (month of projectedMonths(); track month.month) {
+              <div class="table-row">
+                <span>{{ getMonthLabel(month.month) }}</span>
+                <span>{{ formatCurrency(month.expenses) }}</span>
+                <span [class.negative]="month.savings < 0" [class.positive-text]="month.savings > 0">
+                  {{ month.savings >= 0 ? '+' : '-' }}{{ formatCurrency(month.savings) }}
+                </span>
+                <span [class.negative]="month.balance < 0">{{ formatCurrency(month.balance) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
