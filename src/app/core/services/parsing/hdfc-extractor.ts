@@ -15,6 +15,7 @@
 import { TextLine, TextItem } from './pdf-text-extractor';
 import { parseDate, startsWithDate, DATE_START_REGEX } from './date-parser';
 import { parseAbsAmount, AMOUNT_REGEX } from './amount-parser';
+import { extractRows } from './row-extractor';
 import type { RawRow } from './row-extractor';
 
 interface ColumnBounds {
@@ -22,6 +23,9 @@ interface ColumnBounds {
   depositX: number;      // left edge of Deposit column
   balanceX: number;      // left edge of Closing Balance column
 }
+
+const HDFC_INLINE_DATE_REGEX = /\d{2}\/\d{2}\/\d{2}/g;
+const HDFC_AMOUNT_TOKEN_REGEX = /^[\d,]+\.\d{2}$/;
 
 
 /**
@@ -106,6 +110,20 @@ export function extractHdfcRows(lines: TextLine[]): RawRow[] {
   return rows;
 }
 
+export function extractHdfcRowsFromText(text: string): RawRow[] {
+  const splitLines = text
+    .split('\n')
+    .flatMap(splitInlineHdfcTransactions)
+    .map((line, index) => ({
+      text: line,
+      items: [],
+      y: index * 10,
+      page: index + 1,
+    }));
+
+  return extractRows(splitLines);
+}
+
 /**
  * Filter lines: include everything after each column header row.
  * The column header row appears on every page of the HDFC statement.
@@ -156,6 +174,35 @@ function groupTransactionLines(lines: TextLine[]): TextLine[][] {
 
   if (currentGroup) groups.push(currentGroup);
   return groups;
+}
+
+function splitInlineHdfcTransactions(line: string): string[] {
+  const normalized = line.replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+
+  const startIndexes: number[] = [];
+  for (const match of normalized.matchAll(HDFC_INLINE_DATE_REGEX)) {
+    const idx = match.index ?? -1;
+    if (idx < 0) continue;
+    const after = normalized.slice(idx + match[0].length).trimStart();
+    const nextToken = after.split(/\s+/, 1)[0] || '';
+    if (!HDFC_AMOUNT_TOKEN_REGEX.test(nextToken)) {
+      startIndexes.push(idx);
+    }
+  }
+
+  if (startIndexes.length <= 1) {
+    return normalized ? [normalized] : [];
+  }
+
+  const result: string[] = [];
+  for (let i = 0; i < startIndexes.length; i++) {
+    const start = startIndexes[i];
+    const end = i + 1 < startIndexes.length ? startIndexes[i + 1] : normalized.length;
+    const segment = normalized.slice(start, end).trim();
+    if (segment) result.push(segment);
+  }
+  return result;
 }
 
 /**
