@@ -5,7 +5,11 @@ import { Router } from '@angular/router';
 import { CsvParserService } from '../../core/services/csv-parser.service';
 import { PdfParserService } from '../../core/services/pdf-parser.service';
 import { StorageService } from '../../core/services/storage.service';
-import { ParsedStatement, ColumnMapping } from '../../core/models/transaction.model';
+import { ApiService } from '../../core/services/api.service';
+import { AnalyticsService } from '../../core/services/analytics.service';
+import { ParsedStatement, ColumnMapping, Transaction } from '../../core/models/transaction.model';
+import { buildLLMSummary } from '../../core/services/parsing/normalizer';
+import { PROMPTS, buildPrompt } from '../../core/config/prompts';
 
 interface UploadedFile {
   file: File;
@@ -13,6 +17,12 @@ interface UploadedFile {
   result?: ParsedStatement;
   error?: string;
   accountName: string;
+}
+
+interface AIEnrichment {
+  status: 'idle' | 'running' | 'done' | 'error';
+  insights: string[];
+  error?: string;
 }
 
 @Component({
@@ -35,11 +45,14 @@ export class UploadComponent {
   allDone = computed(() =>
     this.files().length > 0 && this.files().every(f => f.status === 'done' || f.status === 'error')
   );
+  aiEnrichment = signal<AIEnrichment>({ status: 'idle', insights: [] });
 
   constructor(
     private csvParser: CsvParserService,
     private pdfParser: PdfParserService,
     private storage: StorageService,
+    private api: ApiService,
+    private analytics: AnalyticsService,
     private router: Router
   ) {}
 
@@ -99,6 +112,15 @@ export class UploadComponent {
     for (let i = 0; i < current.length; i++) {
       if (current[i].status !== 'pending') continue;
       await this.parseFile(i);
+    }
+
+    // Auto-trigger AI enrichment on parsed transactions
+    const allTxns = this.files()
+      .filter(f => f.result)
+      .flatMap(f => f.result!.transactions);
+
+    if (allTxns.length > 0) {
+      this.triggerAIEnrichment(allTxns);
     }
   }
 
@@ -167,5 +189,47 @@ export class UploadComponent {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  private async triggerAIEnrichment(transactions: Transaction[]): Promise<void> {
+    this.aiEnrichment.set({ status: 'running', insights: [] });
+
+    try {
+      const context = buildLLMSummary(transactions);
+      const prompt = buildPrompt(PROMPTS.INSIGHTS, { CONTEXT: context });
+      const result = await this.api.callGeneric(prompt, context);
+
+      if (result.success && result.data) {
+        const parsed = this.api.parseJsonResponse<
+          { title: string; message: string }[]
+        >(result.data);
+
+        if (parsed && Array.isArray(parsed)) {
+          this.aiEnrichment.set({
+            status: 'done',
+            insights: parsed.map(i => `${i.title}: ${i.message}`),
+          });
+          return;
+        }
+
+        // If not JSON, treat the raw text as a single insight
+        this.aiEnrichment.set({
+          status: 'done',
+          insights: [result.data],
+        });
+      } else {
+        this.aiEnrichment.set({
+          status: 'error',
+          insights: [],
+          error: result.error || 'AI enrichment failed',
+        });
+      }
+    } catch (e) {
+      this.aiEnrichment.set({
+        status: 'error',
+        insights: [],
+        error: String(e),
+      });
+    }
   }
 }

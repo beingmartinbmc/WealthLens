@@ -282,6 +282,60 @@
   .warning { color: #FFEAA7; }
 }
 
+.ai-enrichment-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background: rgba(108, 92, 231, 0.06);
+  border: 1px solid rgba(108, 92, 231, 0.15);
+  border-radius: 12px;
+
+  h3 {
+    font-size: 16px;
+    color: #e0e0e0;
+    margin-bottom: 12px;
+  }
+}
+
+.ai-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #a0a0b8;
+
+  &.running { color: #6C5CE7; }
+  &.error { color: #FF6B6B; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(108, 92, 231, 0.3);
+    border-top-color: #6C5CE7;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+.ai-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-insight-card {
+  padding: 12px 16px;
+  background: rgba(108, 92, 231, 0.08);
+  border: 1px solid rgba(108, 92, 231, 0.15);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #c0c0d8;
+  line-height: 1.5;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .privacy-notice {
   display: flex;
   align-items: flex-start;

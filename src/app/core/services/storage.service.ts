@@ -208,6 +208,17 @@ export class StorageService {
     return result?.value as T | undefined;
   }
 
+  // --- Clear All Data ---
+  async clearAllData(): Promise<void> {
+    const db = await this.getDB();
+    await db.clear('transactions');
+    await db.clear('categoryOverrides');
+    await db.clear('anomalies');
+    await db.clear('subscriptions');
+    await db.clear('chatSessions');
+    await db.clear('settings');
+  }
+
   // --- Utility ---
   async getStats(): Promise<{ transactionCount: number; accountCount: number; sourceFiles: string[] }> {
     const db = await this.getDB();

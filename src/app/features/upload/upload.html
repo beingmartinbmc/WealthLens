@@ -121,6 +121,31 @@
     </div>
   }
 
+  <!-- AI Enrichment Status -->
+  @if (aiEnrichment().status !== 'idle') {
+    <div class="ai-enrichment-section">
+      <h3>🤖 AI Analysis</h3>
+      @if (aiEnrichment().status === 'running') {
+        <div class="ai-status running">
+          <div class="spinner"></div>
+          <span>Analyzing your transactions with AI...</span>
+        </div>
+      }
+      @if (aiEnrichment().status === 'done') {
+        <div class="ai-insights">
+          @for (insight of aiEnrichment().insights; track insight) {
+            <div class="ai-insight-card">{{ insight }}</div>
+          }
+        </div>
+      }
+      @if (aiEnrichment().status === 'error') {
+        <div class="ai-status error">
+          <span>⚠️ AI analysis unavailable: {{ aiEnrichment().error }}</span>
+        </div>
+      }
+    </div>
+  }
+
   <!-- Privacy Notice -->
   <div class="privacy-notice">
     <span class="privacy-icon">🔒</span>

@@ -1,5 +1,6 @@
-import { Component, output } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { StorageService } from '../../../core/services/storage.service';
 
 interface NavItem {
   label: string;
@@ -34,6 +35,19 @@ interface NavItem {
       </nav>
 
       <div class="sidebar-footer">
+        @if (confirmingClear()) {
+          <div class="clear-confirm">
+            <span>Delete all data?</span>
+            <div class="clear-actions">
+              <button class="btn-confirm" (click)="confirmClear()">Yes, clear</button>
+              <button class="btn-cancel" (click)="confirmingClear.set(false)">Cancel</button>
+            </div>
+          </div>
+        } @else {
+          <button class="clear-btn" (click)="confirmingClear.set(true)">
+            <span>🗑️</span> Clear Data & Restart
+          </button>
+        }
         <div class="privacy-badge">
           <span class="privacy-icon">🔒</span>
           <span class="privacy-text">Your data never leaves your device</span>
@@ -130,9 +144,82 @@ interface NavItem {
     }
 
     .privacy-icon { font-size: 14px; }
+
+    .clear-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: rgba(255, 107, 107, 0.08);
+      border: 1px solid rgba(255, 107, 107, 0.2);
+      border-radius: 8px;
+      color: #FF6B6B;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .clear-btn:hover {
+      background: rgba(255, 107, 107, 0.15);
+      border-color: rgba(255, 107, 107, 0.4);
+    }
+
+    .clear-confirm {
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #FF6B6B;
+    }
+    .clear-confirm span { font-weight: 600; }
+    .clear-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn-confirm {
+      flex: 1;
+      padding: 6px;
+      background: #FF6B6B;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-confirm:hover { background: #e55; }
+    .btn-cancel {
+      flex: 1;
+      padding: 6px;
+      background: transparent;
+      color: #a0a0b8;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn-cancel:hover { color: #e0e0e0; }
   `]
 })
 export class SidebarComponent {
+  confirmingClear = signal(false);
+
+  constructor(
+    private storage: StorageService,
+    private router: Router,
+  ) {}
+
+  async confirmClear(): Promise<void> {
+    await this.storage.clearAllData();
+    this.confirmingClear.set(false);
+    this.router.navigate(['/upload']);
+  }
+
   navItems: NavItem[] = [
     { label: 'Upload', icon: '📥', route: '/upload' },
     { label: 'Dashboard', icon: '📊', route: '/dashboard' },
