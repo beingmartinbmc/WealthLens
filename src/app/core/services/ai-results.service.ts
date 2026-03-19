@@ -2,17 +2,19 @@ import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { StorageService } from './storage.service';
 import { Transaction } from '../models/transaction.model';
-import {
-  AIResults,
-  AIDashboardSummary,
-  AIHealthTip,
-  AIInsight,
-  AIAnomaly,
-} from '../models/ai-results.model';
+import { AIResults } from '../models/ai-results.model';
 import { buildLLMSummary } from './parsing/normalizer';
 import { PROMPTS, buildPrompt } from '../config/prompts';
 
 const AI_RESULTS_KEY = 'ai-results';
+
+/** Shape returned by the ANALYZE_ALL prompt */
+interface AnalyzeAllResponse {
+  summary?: { text?: string; highlights?: string[]; sentiment?: string };
+  insights?: { title: string; message: string; priority?: string; amount?: number; percentChange?: number }[];
+  healthTips?: { tip: string; impact?: string; category?: string }[];
+  anomalies?: { type?: string; title: string; message: string; severity?: string; amount?: number }[];
+}
 
 @Injectable({ providedIn: 'root' })
 export class AIResultsService {
@@ -22,32 +24,56 @@ export class AIResultsService {
   ) {}
 
   /**
-   * Run all LLM calls in parallel after parsing.
+   * Single LLM call that generates all AI data at once.
    * Stores results in IndexedDB settings store.
    */
   async generateAll(transactions: Transaction[]): Promise<AIResults> {
     const context = buildLLMSummary(transactions);
+    const prompt = buildPrompt(PROMPTS.ANALYZE_ALL, { CONTEXT: context });
 
-    // Fire all prompts in parallel
-    const [summaryRes, healthRes, insightsRes, anomaliesRes] = await Promise.allSettled([
-      this.fetchDashboardSummary(context),
-      this.fetchHealthTips(context),
-      this.fetchInsights(context),
-      this.fetchAnomalies(context),
-    ]);
+    const res = await this.api.callGeneric(prompt, context);
+    const parsed = res.success && res.data
+      ? this.api.parseJsonResponse<AnalyzeAllResponse>(res.data)
+      : null;
 
     const results: AIResults = {
-      dashboardSummary: summaryRes.status === 'fulfilled' ? summaryRes.value : null,
-      healthTips: healthRes.status === 'fulfilled' ? healthRes.value : [],
-      insights: insightsRes.status === 'fulfilled' ? insightsRes.value : [],
-      anomalies: anomaliesRes.status === 'fulfilled' ? anomaliesRes.value : [],
+      dashboardSummary: parsed?.summary?.text
+        ? {
+            summary: parsed.summary.text,
+            highlights: parsed.summary.highlights ?? [],
+            sentiment: (parsed.summary.sentiment as 'positive' | 'neutral' | 'negative') ?? 'neutral',
+          }
+        : null,
+      insights: Array.isArray(parsed?.insights)
+        ? parsed.insights.map(i => ({
+            title: i.title,
+            message: i.message,
+            priority: (i.priority as 'high' | 'medium' | 'low') ?? 'medium',
+            amount: i.amount,
+            percentChange: i.percentChange,
+          }))
+        : [],
+      healthTips: Array.isArray(parsed?.healthTips)
+        ? parsed.healthTips.map(t => ({
+            tip: t.tip,
+            impact: (t.impact as 'high' | 'medium' | 'low') ?? 'medium',
+            category: (t.category as 'savings' | 'spending' | 'investment' | 'debt') ?? 'spending',
+          }))
+        : [],
+      anomalies: Array.isArray(parsed?.anomalies)
+        ? parsed.anomalies.map(a => ({
+            type: (a.type as 'spike' | 'duplicate' | 'unusual' | 'pattern') ?? 'unusual',
+            title: a.title,
+            message: a.message,
+            severity: (a.severity as 'high' | 'medium' | 'low') ?? 'medium',
+            amount: a.amount,
+          }))
+        : [],
       generatedAt: new Date().toISOString(),
       transactionCount: transactions.length,
     };
 
-    // Persist to IndexedDB
     await this.storage.setSetting(AI_RESULTS_KEY, results);
-
     return results;
   }
 
@@ -63,44 +89,5 @@ export class AIResultsService {
    */
   async clearCache(): Promise<void> {
     await this.storage.setSetting(AI_RESULTS_KEY, null);
-  }
-
-  // --- Individual LLM calls ---
-
-  private async fetchDashboardSummary(context: string): Promise<AIDashboardSummary | null> {
-    const prompt = buildPrompt(PROMPTS.DASHBOARD_SUMMARY, { CONTEXT: context });
-    const res = await this.api.callGeneric(prompt, context);
-    if (!res.success || !res.data) return null;
-
-    const parsed = this.api.parseJsonResponse<AIDashboardSummary>(res.data);
-    if (!parsed || !parsed.summary) return null;
-    return parsed;
-  }
-
-  private async fetchHealthTips(context: string): Promise<AIHealthTip[]> {
-    const prompt = buildPrompt(PROMPTS.DASHBOARD_HEALTH, { CONTEXT: context });
-    const res = await this.api.callGeneric(prompt, context);
-    if (!res.success || !res.data) return [];
-
-    const parsed = this.api.parseJsonResponse<AIHealthTip[]>(res.data);
-    return Array.isArray(parsed) ? parsed : [];
-  }
-
-  private async fetchInsights(context: string): Promise<AIInsight[]> {
-    const prompt = buildPrompt(PROMPTS.INSIGHTS, { CONTEXT: context });
-    const res = await this.api.callGeneric(prompt, context);
-    if (!res.success || !res.data) return [];
-
-    const parsed = this.api.parseJsonResponse<AIInsight[]>(res.data);
-    return Array.isArray(parsed) ? parsed : [];
-  }
-
-  private async fetchAnomalies(context: string): Promise<AIAnomaly[]> {
-    const prompt = buildPrompt(PROMPTS.AI_ANOMALIES, { CONTEXT: context });
-    const res = await this.api.callGeneric(prompt, context);
-    if (!res.success || !res.data) return [];
-
-    const parsed = this.api.parseJsonResponse<AIAnomaly[]>(res.data);
-    return Array.isArray(parsed) ? parsed : [];
   }
 }

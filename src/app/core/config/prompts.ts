@@ -39,26 +39,35 @@ User Question: {{QUESTION}}`,
 
 Respond as a JSON array of objects: { type: "duplicate"|"anomaly"|"suspicious", message: string, amount: number, confidence: number }.`,
 
-  /** Dashboard financial summary — natural language overview */
-  DASHBOARD_SUMMARY: `You are a concise financial analyst. Based on the data below, write a 3-4 sentence personalized financial summary. Mention the savings rate, biggest spending category, any notable month-over-month trends, and one actionable suggestion. Use ₹ for amounts. Be direct — no filler.
+  /** Single combined prompt — generates all AI data in one LLM call */
+  ANALYZE_ALL: `You are WealthLens, a concise financial analyst for Indian users. Analyze the data below and return a single JSON object with ALL four sections. Use ₹ for amounts. Be specific with real numbers. No filler.
 
 {{CONTEXT}}
 
-Respond as JSON: { "summary": "...", "highlights": ["highlight1", "highlight2", "highlight3"], "sentiment": "positive" | "neutral" | "negative" }`,
+Return ONLY valid JSON with this exact structure:
+{
+  "summary": {
+    "text": "3-4 sentence personalized financial overview mentioning savings rate, top spending category, month-over-month trends, and one suggestion",
+    "highlights": ["highlight1", "highlight2", "highlight3"],
+    "sentiment": "positive | neutral | negative"
+  },
+  "insights": [
+    { "title": "...", "message": "...", "priority": "high|medium|low", "amount": 0, "percentChange": 0 }
+  ],
+  "healthTips": [
+    { "tip": "...", "impact": "high|medium|low", "category": "savings|spending|investment|debt" }
+  ],
+  "anomalies": [
+    { "type": "spike|duplicate|unusual|pattern", "title": "...", "message": "...", "severity": "high|medium|low", "amount": 0 }
+  ]
+}
 
-  /** Dashboard health analysis — AI-powered tips */
-  DASHBOARD_HEALTH: `Based on this financial data, provide 3-4 specific, actionable health tips. Reference actual numbers from the data. Focus on: savings improvement, spending optimization, subscription audit, and investment opportunities relevant to Indian users.
-
-{{CONTEXT}}
-
-Respond as JSON array: [{ "tip": "...", "impact": "high" | "medium" | "low", "category": "savings" | "spending" | "investment" | "debt" }]`,
-
-  /** AI-powered anomaly detection */
-  AI_ANOMALIES: `Analyze these transactions for anomalies. Look for: unusually large transactions, duplicate charges, sudden spending spikes, potential unauthorized transactions, and unusual patterns. Only flag genuine concerns with specific amounts and dates.
-
-{{CONTEXT}}
-
-Respond as JSON array: [{ "type": "spike" | "duplicate" | "unusual" | "pattern", "title": "...", "message": "...", "severity": "high" | "medium" | "low", "amount": number }]`,
+Rules:
+- summary: exactly 1 object with text, highlights (3 items), sentiment
+- insights: 3-5 actionable items about spending patterns, saving opportunities
+- healthTips: 3-4 specific tips referencing actual numbers
+- anomalies: 0-5 genuine concerns only (empty array if none). Include unusually large transactions, duplicates, spending spikes
+- amount and percentChange are optional numbers (omit if not applicable)`,
 
   /** Tax insights for Indian context */
   TAX_INSIGHTS: `Based on the following Indian financial data, identify potential tax deductions under sections 80C, 80D, 80G, HRA (10(13A)), and others. Only mention sections that apply.
