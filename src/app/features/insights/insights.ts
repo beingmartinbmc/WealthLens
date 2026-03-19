@@ -3,11 +3,10 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { StorageService } from '../../core/services/storage.service';
 import { AnalyticsService } from '../../core/services/analytics.service';
-import { ApiService } from '../../core/services/api.service';
+import { AIResultsService } from '../../core/services/ai-results.service';
 import { Transaction } from '../../core/models/transaction.model';
 import { Insight, Anomaly, SubscriptionDetection } from '../../core/models/insight.model';
-import { buildLLMSummary } from '../../core/services/parsing/normalizer';
-import { PROMPTS, buildPrompt } from '../../core/config/prompts';
+import { AIAnomaly } from '../../core/models/ai-results.model';
 import { v4 as uuidv4 } from 'uuid';
 
 @Component({
@@ -24,10 +23,13 @@ export class InsightsComponent implements OnInit {
   loading = signal(true);
   activeTab = signal<'insights' | 'anomalies' | 'subscriptions'>('insights');
 
+  aiAnomalies = signal<AIAnomaly[]>([]);
+  activeAnomalyTab = signal<'local' | 'ai'>('ai');
+
   constructor(
     private storage: StorageService,
     private analytics: AnalyticsService,
-    private api: ApiService,
+    private aiResults: AIResultsService,
     private router: Router
   ) {}
 
@@ -58,8 +60,8 @@ export class InsightsComponent implements OnInit {
 
     this.loading.set(false);
 
-    // Enrich with AI insights in background
-    this.fetchAIInsights(txns, localInsights);
+    // Load pre-computed AI results from storage
+    this.loadAIResults(localInsights);
   }
 
   setTab(tab: 'insights' | 'anomalies' | 'subscriptions'): void {
@@ -113,35 +115,45 @@ export class InsightsComponent implements OnInit {
     this.router.navigate(['/upload']);
   }
 
-  private async fetchAIInsights(txns: Transaction[], localInsights: Insight[]): Promise<void> {
+  setAnomalyTab(tab: 'local' | 'ai'): void {
+    this.activeAnomalyTab.set(tab);
+  }
+
+  getSeverityColor(severity: string): string {
+    switch (severity) {
+      case 'high': return '#FF6B6B';
+      case 'medium': return '#FFEAA7';
+      case 'low': return '#00B894';
+      default: return '#a0a0b8';
+    }
+  }
+
+  private async loadAIResults(localInsights: Insight[]): Promise<void> {
     try {
-      const context = buildLLMSummary(txns);
-      const prompt = buildPrompt(PROMPTS.INSIGHTS, { CONTEXT: context });
-      const result = await this.api.callGeneric(prompt, context);
+      const cached = await this.aiResults.getCached();
+      if (!cached) return;
 
-      if (!result.success || !result.data) return;
+      // Merge AI insights
+      if (cached.insights.length > 0) {
+        const aiInsights: Insight[] = cached.insights.map(item => ({
+          id: uuidv4(),
+          type: 'ai' as const,
+          title: '\u{1F916} ' + item.title,
+          message: item.message,
+          priority: item.priority || 'medium',
+          amount: item.amount,
+          percentChange: item.percentChange,
+          createdAt: cached.generatedAt,
+        }));
+        this.insights.set([...aiInsights, ...localInsights]);
+      }
 
-      const parsed = this.api.parseJsonResponse<
-        { title: string; message: string; priority: string; amount?: number; percentChange?: number }[]
-      >(result.data);
-
-      if (!parsed || !Array.isArray(parsed)) return;
-
-      const aiInsights: Insight[] = parsed.map(item => ({
-        id: uuidv4(),
-        type: 'ai',
-        title: '🤖 ' + item.title,
-        message: item.message,
-        priority: (item.priority as 'high' | 'medium' | 'low') || 'medium',
-        amount: item.amount,
-        percentChange: item.percentChange,
-        createdAt: new Date().toISOString(),
-      }));
-
-      // Merge: AI insights after local ones
-      this.insights.set([...localInsights, ...aiInsights]);
+      // Load AI anomalies
+      if (cached.anomalies.length > 0) {
+        this.aiAnomalies.set(cached.anomalies);
+      }
     } catch {
-      // Silently fail — local insights are already displayed
+      // AI results unavailable — local insights already shown
     }
   }
 }

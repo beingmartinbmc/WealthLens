@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { StorageService } from '../../core/services/storage.service';
 import { AnalyticsService } from '../../core/services/analytics.service';
+import { AIResultsService } from '../../core/services/ai-results.service';
 import { Transaction } from '../../core/models/transaction.model';
 import { FinancialSummary, FinancialHealthScore } from '../../core/models/insight.model';
+import { AIDashboardSummary, AIHealthTip } from '../../core/models/ai-results.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -21,6 +23,9 @@ export class DashboardComponent implements OnInit {
   dailySpend = signal<{ date: string; amount: number }[]>([]);
   loading = signal(true);
   selectedPeriod = signal<number>(0); // 0 = all, 3, 6, 12 months
+  aiSummary = signal<AIDashboardSummary | null>(null);
+  aiHealthTips = signal<AIHealthTip[]>([]);
+  aiLoading = signal(false);
 
   hasData = computed(() => this.transactions().length > 0);
 
@@ -39,6 +44,7 @@ export class DashboardComponent implements OnInit {
   constructor(
     private storage: StorageService,
     private analytics: AnalyticsService,
+    private aiResults: AIResultsService,
     private router: Router
   ) {}
 
@@ -70,6 +76,40 @@ export class DashboardComponent implements OnInit {
     this.dailySpend.set(daily);
 
     this.loading.set(false);
+
+    // Load cached AI results
+    this.loadAIResults();
+  }
+
+  private async loadAIResults(): Promise<void> {
+    this.aiLoading.set(true);
+    try {
+      const cached = await this.aiResults.getCached();
+      if (cached) {
+        this.aiSummary.set(cached.dashboardSummary);
+        this.aiHealthTips.set(cached.healthTips);
+      }
+    } catch {
+      // AI results unavailable — local analytics still shown
+    }
+    this.aiLoading.set(false);
+  }
+
+  getSentimentIcon(sentiment: string): string {
+    switch (sentiment) {
+      case 'positive': return '\u{1F7E2}';
+      case 'negative': return '\u{1F534}';
+      default: return '\u{1F7E1}';
+    }
+  }
+
+  getImpactColor(impact: string): string {
+    switch (impact) {
+      case 'high': return '#FF6B6B';
+      case 'medium': return '#FFEAA7';
+      case 'low': return '#00B894';
+      default: return '#a0a0b8';
+    }
   }
 
   async setPeriod(months: number): Promise<void> {

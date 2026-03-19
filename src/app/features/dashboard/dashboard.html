@@ -23,6 +23,26 @@
       </div>
     </div>
 
+    <!-- AI Summary Card -->
+    @if (aiSummary(); as ai) {
+      <div class="ai-summary-card">
+        <div class="ai-badge">🤖 AI Analysis</div>
+        <p class="ai-summary-text">{{ ai.summary }}</p>
+        @if (ai.highlights.length > 0) {
+          <div class="ai-highlights">
+            @for (h of ai.highlights; track $index) {
+              <span class="ai-highlight">{{ h }}</span>
+            }
+          </div>
+        }
+      </div>
+    } @else if (aiLoading()) {
+      <div class="ai-summary-card loading-pulse">
+        <div class="ai-badge">🤖 AI Analysis</div>
+        <p class="ai-summary-text shimmer">Generating AI insights...</p>
+      </div>
+    }
+
     <!-- Key Metrics -->
     @if (summary(); as s) {
       <div class="metrics-grid">
@@ -197,7 +217,17 @@
               <span class="health-score">{{ h.breakdown.diversification }}/25</span>
             </div>
           </div>
-          @if (h.tips.length > 0) {
+          @if (aiHealthTips().length > 0) {
+            <div class="health-tips ai-tips">
+              <h4>🤖 AI-Powered Tips</h4>
+              @for (tip of aiHealthTips(); track $index) {
+                <div class="tip">
+                  <span class="tip-impact" [style.color]="getImpactColor(tip.impact)">● {{ tip.impact }}</span>
+                  {{ tip.tip }}
+                </div>
+              }
+            </div>
+          } @else if (h.tips.length > 0) {
             <div class="health-tips">
               <h4>Tips to Improve</h4>
               @for (tip of h.tips; track $index) {

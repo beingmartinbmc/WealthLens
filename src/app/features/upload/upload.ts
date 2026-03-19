@@ -5,11 +5,8 @@ import { Router } from '@angular/router';
 import { CsvParserService } from '../../core/services/csv-parser.service';
 import { PdfParserService } from '../../core/services/pdf-parser.service';
 import { StorageService } from '../../core/services/storage.service';
-import { ApiService } from '../../core/services/api.service';
-import { AnalyticsService } from '../../core/services/analytics.service';
+import { AIResultsService } from '../../core/services/ai-results.service';
 import { ParsedStatement, ColumnMapping, Transaction } from '../../core/models/transaction.model';
-import { buildLLMSummary } from '../../core/services/parsing/normalizer';
-import { PROMPTS, buildPrompt } from '../../core/config/prompts';
 
 interface UploadedFile {
   file: File;
@@ -51,8 +48,7 @@ export class UploadComponent {
     private csvParser: CsvParserService,
     private pdfParser: PdfParserService,
     private storage: StorageService,
-    private api: ApiService,
-    private analytics: AnalyticsService,
+    private aiResults: AIResultsService,
     private router: Router
   ) {}
 
@@ -114,13 +110,13 @@ export class UploadComponent {
       await this.parseFile(i);
     }
 
-    // Auto-trigger AI enrichment on parsed transactions
+    // Fire all LLM calls in parallel (dashboard summary, health, insights, anomalies)
     const allTxns = this.files()
       .filter(f => f.result)
       .flatMap(f => f.result!.transactions);
 
     if (allTxns.length > 0) {
-      this.triggerAIEnrichment(allTxns);
+      this.triggerAIGeneration(allTxns);
     }
   }
 
@@ -191,39 +187,24 @@ export class UploadComponent {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  private async triggerAIEnrichment(transactions: Transaction[]): Promise<void> {
+  private async triggerAIGeneration(transactions: Transaction[]): Promise<void> {
     this.aiEnrichment.set({ status: 'running', insights: [] });
 
     try {
-      const context = buildLLMSummary(transactions);
-      const prompt = buildPrompt(PROMPTS.INSIGHTS, { CONTEXT: context });
-      const result = await this.api.callGeneric(prompt, context);
+      const results = await this.aiResults.generateAll(transactions);
 
-      if (result.success && result.data) {
-        const parsed = this.api.parseJsonResponse<
-          { title: string; message: string }[]
-        >(result.data);
-
-        if (parsed && Array.isArray(parsed)) {
-          this.aiEnrichment.set({
-            status: 'done',
-            insights: parsed.map(i => `${i.title}: ${i.message}`),
-          });
-          return;
-        }
-
-        // If not JSON, treat the raw text as a single insight
-        this.aiEnrichment.set({
-          status: 'done',
-          insights: [result.data],
-        });
-      } else {
-        this.aiEnrichment.set({
-          status: 'error',
-          insights: [],
-          error: result.error || 'AI enrichment failed',
-        });
+      const insights: string[] = [];
+      if (results.dashboardSummary) {
+        insights.push(results.dashboardSummary.summary);
       }
+      for (const i of results.insights) {
+        insights.push(`${i.title}: ${i.message}`);
+      }
+
+      this.aiEnrichment.set({
+        status: 'done',
+        insights,
+      });
     } catch (e) {
       this.aiEnrichment.set({
         status: 'error',

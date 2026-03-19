@@ -276,3 +276,39 @@
     &:hover { background: #5b4bd5; }
   }
 }
+
+// Anomaly sub-tabs
+.anomaly-sub-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 16px;
+
+  button {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    color: #a0a0b8;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover { color: #fff; }
+    &.active {
+      background: rgba(108, 92, 231, 0.2);
+      color: #6C5CE7;
+    }
+  }
+}
+
+// AI anomaly severity
+.ai-anomaly {
+  &.severity-high { border-left: 3px solid #FF6B6B; }
+  &.severity-medium { border-left: 3px solid #FFEAA7; }
+  &.severity-low { border-left: 3px solid #00B894; }
+}

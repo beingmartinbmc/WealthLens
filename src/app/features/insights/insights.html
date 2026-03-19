@@ -57,37 +57,77 @@
 
     <!-- Anomalies Tab -->
     @if (activeTab() === 'anomalies') {
-      <div class="card-list">
-        @if (anomalies().length === 0) {
-          <div class="no-items">
-            <span>✅</span>
-            <p>No anomalies detected. Your transactions look clean!</p>
-          </div>
-        }
-        @for (anomaly of anomalies(); track anomaly.id) {
-          <div class="anomaly-card" [class]="'type-' + anomaly.type">
-            <div class="card-header">
-              <span class="anomaly-icon">
-                @switch (anomaly.type) {
-                  @case ('duplicate') { 📋 }
-                  @case ('anomaly') { ⚠️ }
-                  @case ('subscription') { 🔄 }
-                }
-              </span>
-              <div class="anomaly-info">
-                <span class="anomaly-type">{{ anomaly.type | titlecase }}</span>
-                <span class="anomaly-confidence">
-                  Confidence: {{ getConfidenceLabel(anomaly.confidence) }}
+      @if (aiAnomalies().length > 0) {
+        <div class="anomaly-sub-tabs">
+          <button [class.active]="activeAnomalyTab() === 'ai'" (click)="setAnomalyTab('ai')">
+            🤖 AI Detected ({{ aiAnomalies().length }})
+          </button>
+          <button [class.active]="activeAnomalyTab() === 'local'" (click)="setAnomalyTab('local')">
+            🔍 Local ({{ anomalies().length }})
+          </button>
+        </div>
+      }
+
+      @if (activeAnomalyTab() === 'ai' && aiAnomalies().length > 0) {
+        <div class="card-list">
+          @for (a of aiAnomalies(); track $index) {
+            <div class="anomaly-card ai-anomaly" [class]="'severity-' + a.severity">
+              <div class="card-header">
+                <span class="anomaly-icon">
+                  @switch (a.type) {
+                    @case ('spike') { 📈 }
+                    @case ('duplicate') { 📋 }
+                    @case ('unusual') { ⚠️ }
+                    @case ('pattern') { 🔍 }
+                  }
                 </span>
+                <div class="anomaly-info">
+                  <span class="anomaly-type">{{ a.title }}</span>
+                  <span class="anomaly-confidence">
+                    Severity: <span [style.color]="getSeverityColor(a.severity)">{{ a.severity }}</span>
+                  </span>
+                </div>
+                @if (a.amount) {
+                  <span class="card-amount">{{ formatCurrency(a.amount) }}</span>
+                }
               </div>
-              @if (anomaly.amount) {
-                <span class="card-amount">{{ formatCurrency(anomaly.amount) }}</span>
-              }
+              <p class="card-message">{{ a.message }}</p>
             </div>
-            <p class="card-message">{{ anomaly.message }}</p>
-          </div>
-        }
-      </div>
+          }
+        </div>
+      } @else {
+        <div class="card-list">
+          @if (anomalies().length === 0) {
+            <div class="no-items">
+              <span>✅</span>
+              <p>No anomalies detected. Your transactions look clean!</p>
+            </div>
+          }
+          @for (anomaly of anomalies(); track anomaly.id) {
+            <div class="anomaly-card" [class]="'type-' + anomaly.type">
+              <div class="card-header">
+                <span class="anomaly-icon">
+                  @switch (anomaly.type) {
+                    @case ('duplicate') { 📋 }
+                    @case ('anomaly') { ⚠️ }
+                    @case ('subscription') { 🔄 }
+                  }
+                </span>
+                <div class="anomaly-info">
+                  <span class="anomaly-type">{{ anomaly.type | titlecase }}</span>
+                  <span class="anomaly-confidence">
+                    Confidence: {{ getConfidenceLabel(anomaly.confidence) }}
+                  </span>
+                </div>
+                @if (anomaly.amount) {
+                  <span class="card-amount">{{ formatCurrency(anomaly.amount) }}</span>
+                }
+              </div>
+              <p class="card-message">{{ anomaly.message }}</p>
+            </div>
+          }
+        </div>
+      }
     }
 
     <!-- Subscriptions Tab -->
